@@ -1,0 +1,30 @@
+# Generated files
+target/
+*.wasm
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Linera
+.linera/
+*.wallet
+
+# Node
+node_modules/
+package-lock.json
+
+# Logs
+*.log
+
+# Build artifacts
+*.o
+*.a
+*.dylib
+*.so

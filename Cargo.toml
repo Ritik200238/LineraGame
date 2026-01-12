@@ -1,0 +1,23 @@
+[package]
+name = "tower-defense"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+linera-sdk = "0.15.8"
+async-trait = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+# Pin async-graphql and all sub-crates to 7.0.17 (7.1.0 requires nightly let_chains)
+async-graphql = { version = "=7.0.17", default-features = false }
+async-graphql-derive = { version = "=7.0.17", default-features = false }
+async-graphql-value = { version = "=7.0.17", default-features = false }
+thiserror = "1.0"
+bcs = "0.1"
+hex = "0.4"
+tower-defense-abi = { path = "./abi" }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dev-dependencies]
+tokio = { version = "1.0", features = ["full"] }

@@ -1,0 +1,13 @@
+[package]
+name = "tower-defense-abi"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+async-graphql = { version = "=7.0.17", default-features = false }
+rand = { version = "0.8", features = ["small_rng"] }
+getrandom = { version = "0.2.15", features = ["custom"] }
+
+[dev-dependencies]
+tokio = { version = "1.0", features = ["full"] }
