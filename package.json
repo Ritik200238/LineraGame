@@ -1,0 +1,38 @@
+{
+  "name": "tower-defense-multiplayer",
+  "version": "1.0.0",
+  "description": "Multiplayer tower defense game on Linera blockchain",
+  "main": "frontend/index.html",
+  "scripts": {
+    "test": "playwright test",
+    "test:multiplayer": "playwright test tests/multiplayer-modes.spec.js",
+    "test:stress": "playwright test tests/stress-tests.spec.js",
+    "test:validation": "playwright test tests/final-validation.spec.js",
+    "test:all": "playwright test tests/",
+    "test:report": "playwright show-report",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "install:playwright": "npx playwright install chromium"
+  },
+  "keywords": [
+    "blockchain",
+    "tower-defense",
+    "multiplayer",
+    "linera",
+    "web3",
+    "game"
+  ],
+  "author": "Claude Sonnet 4.5",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/tower-defense.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/tower-defense/issues"
+  },
+  "homepage": "https://github.com/yourusername/tower-defense#readme"
+}
