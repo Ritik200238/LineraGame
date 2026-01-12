@@ -351,6 +351,11 @@ window.LobbyManager = {
         this.isHost = false;
         this.playerReady = false;
         this.showGameRoom();
+
+        // Show notification
+        if (window.NotificationManager) {
+            window.NotificationManager.success('Joined game successfully!');
+        }
     },
 
     showGameRoom() {
