@@ -1408,3 +1408,63 @@ body::before {
     background: rgba(76, 175, 80, 0.4);
     color: var(--text-primary);
 }
+/* ===== Enhanced Button States (Web2 Quality) ===== */
+.btn:disabled,
+.btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+    pointer-events: none;
+    filter: grayscale(0.5);
+}
+
+.btn.loading {
+    position: relative;
+    color: transparent;
+    pointer-events: none;
+}
+
+.btn.loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid transparent;
+    border-top-color: white;
+    border-radius: 50%;
+    animation: button-loading-spinner 0.6s linear infinite;
+}
+
+@keyframes button-loading-spinner {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ===== Enhanced Interactive Feedback ===== */
+.tower-item:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.grid-cell.placing-mode {
+    cursor: crosshair !important;
+}
+
+.grid-cell.invalid-placement {
+    background: rgba(244, 67, 54, 0.3) !important;
+    border-color: #F44336 !important;
+}
+
+.grid-cell.valid-placement {
+    background: rgba(76, 175, 80, 0.3) !important;
+    border-color: #4CAF50 !important;
+    animation: pulse-valid 1s ease-in-out infinite;
+}
+
+@keyframes pulse-valid {
+    0%, 100% { box-shadow: 0 0 10px rgba(76, 175, 80, 0.4); }
+    50% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.8); }
+}

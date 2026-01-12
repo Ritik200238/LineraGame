@@ -180,10 +180,13 @@ function setupTowerSelection() {
 
     towerList.innerHTML = '';
 
-    Object.entries(TOWER_TYPES).forEach(([name, tower]) => {
+    Object.entries(TOWER_TYPES).forEach(([name, tower], index) => {
         const towerItem = document.createElement('div');
         towerItem.className = 'tower-item';
         towerItem.dataset.tower = name;
+
+        // Add tooltip with full stats
+        towerItem.title = `${name} Tower [${index + 1}]\n${tower.description}\nCost: ${tower.cost} | Damage: ${tower.damage} | Range: ${tower.range}`;
 
         towerItem.innerHTML = `
             <div class="tower-header">
@@ -384,6 +387,31 @@ function updateUI() {
     if (statusDisplay) statusDisplay.textContent = gameState.gameStatus;
     if (enemyCount) enemyCount.textContent = gameState.enemies.length;
     if (towerCount) towerCount.textContent = gameState.towers.length;
+
+    // Update button states (Web2 quality feedback)
+    const startWaveBtn = document.getElementById('start-wave-btn');
+    if (startWaveBtn) {
+        if (gameState.waveActive || gameState.towers.length === 0) {
+            startWaveBtn.disabled = true;
+            startWaveBtn.classList.add('disabled');
+        } else {
+            startWaveBtn.disabled = false;
+            startWaveBtn.classList.remove('disabled');
+        }
+    }
+
+    // Update tower items based on gold
+    document.querySelectorAll('.tower-item').forEach(item => {
+        const towerType = item.dataset.tower;
+        const towerDef = TOWER_TYPES[towerType];
+        if (towerDef && gameState.gold < towerDef.cost) {
+            item.classList.add('disabled');
+            item.style.opacity = '0.5';
+        } else {
+            item.classList.remove('disabled');
+            item.style.opacity = '1';
+        }
+    });
 
     // Update portraits based on game state
     updatePortraits();
@@ -887,3 +915,56 @@ function showToast(message, type = 'info') {
         setTimeout(() => toast.remove(), 300);
     }, 3000);
 }
+
+// ===== Keyboard Shortcuts (Web2 Quality) =====
+document.addEventListener('keydown', (e) => {
+    // ESC - Close modal
+    if (e.key === 'Escape' || e.key === 'Esc') {
+        const settingsModal = document.getElementById('settings-modal');
+        if (settingsModal && settingsModal.classList.contains('show')) {
+            settingsModal.classList.remove('show');
+        }
+        // Deselect tower
+        gameState.selectedTower = null;
+        document.querySelectorAll('.tower-item.selected').forEach(el => el.classList.remove('selected'));
+        const infoPanel = document.getElementById('selected-tower-info');
+        if (infoPanel) {
+            infoPanel.innerHTML = `
+                <div class="status-label">Selection</div>
+                <div class="status-value">Choose a defender</div>
+            `;
+        }
+    }
+    
+    // Space - Start Wave
+    if (e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault(); // Prevent page scroll
+        const startWaveBtn = document.getElementById('start-wave-btn');
+        if (startWaveBtn && !startWaveBtn.disabled && !gameState.waveActive && gameState.towers.length > 0) {
+            startWave();
+        }
+    }
+    
+    // R - Refresh grid
+    if (e.key === 'r' || e.key === 'R') {
+        initializeGrid();
+        renderTowers();
+        showToast('Battlefield refreshed!', 'success');
+    }
+    
+    // Numbers 1-5 - Select tower type quickly
+    const num = parseInt(e.key);
+    if (num >= 1 && num <= 5) {
+        const towerTypes = Object.keys(TOWER_TYPES);
+        if (towerTypes[num - 1]) {
+            const towerName = towerTypes[num - 1];
+            const towerDef = TOWER_TYPES[towerName];
+            const towerElement = document.querySelector(`.tower-item[data-tower="${towerName}"]`);
+            if (towerElement && gameState.gold >= towerDef.cost) {
+                selectTower(towerName, towerDef, towerElement);
+            }
+        }
+    }
+});
+
+console.log('⌨️ Keyboard shortcuts enabled: Space (start wave), ESC (cancel), R (refresh), 1-5 (select towers)');
