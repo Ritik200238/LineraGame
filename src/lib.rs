@@ -27,6 +27,22 @@ pub enum Operation {
     /// Find a game to join (user chain -> public chain)
     FindGame {},
 
+    /// Create a new multiplayer game
+    CreateGame {
+        mode: GameMode,
+        max_players: u8,
+        is_private: bool,
+    },
+
+    /// Join an existing game
+    JoinGame { game_id: String },
+
+    /// Set player ready status in lobby
+    SetPlayerReady { ready: bool },
+
+    /// Leave current game
+    LeaveGame {},
+
     /// Place a tower at a position
     PlaceTower {
         position_x: u8,
@@ -56,6 +72,10 @@ pub enum Operation {
 pub enum OperationResponse {
     Ok,
     FindGameStarted,
+    GameCreated { game_id: String, game_chain: ChainId },
+    JoinedGame { game_id: String },
+    LeftGame,
+    PlayerReadyUpdated { ready: bool },
     TowerPlaced { tower_id: u64 },
     TowerUpgraded { tower_id: u64, new_level: u8 },
     TowerSold { tower_id: u64, refund: u64 },
@@ -65,25 +85,142 @@ pub enum OperationResponse {
 /// Cross-chain messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Message {
+    // ===== Lobby Messages =====
     /// Request to find a game (user chain -> public chain)
     FindGameRequest { user_chain: ChainId },
 
     /// Response with game chain assignment (public chain -> user chain)
     FindGameResult { game_chain: Option<ChainId> },
 
+    /// Create game request (user chain -> game chain)
+    CreateGameRequest {
+        mode: GameMode,
+        max_players: u8,
+        is_private: bool,
+        player_name: String,
+        user_chain: ChainId,
+    },
+
+    /// Create game response (game chain -> user chain)
+    CreateGameResult { game_id: String, success: bool },
+
+    /// Join game request (user chain -> game chain)
+    JoinGameRequest {
+        game_id: String,
+        player_name: String,
+        user_chain: ChainId,
+    },
+
+    /// Join game response (game chain -> user chain)
+    JoinGameResult {
+        game_id: String,
+        success: bool,
+        error: Option<String>,
+    },
+
+    /// Player ready status update (user chain -> game chain)
+    PlayerReadyUpdate {
+        game_id: String,
+        player_id: AccountOwner,
+        ready: bool,
+    },
+
+    /// Start game (host user chain -> game chain)
+    StartGameRequest { game_id: String },
+
+    /// Leave game (user chain -> game chain)
+    LeaveGameRequest {
+        game_id: String,
+        player_id: AccountOwner,
+    },
+
+    // ===== Gameplay Messages =====
+    /// Tower placed notification (game chain -> all player chains)
+    TowerPlacedNotification {
+        game_id: String,
+        player_id: AccountOwner,
+        tower_id: u64,
+        position: (u8, u8),
+        tower_type: TowerType,
+    },
+
+    /// Wave started notification (game chain -> all player chains)
+    WaveStartedNotification {
+        game_id: String,
+        player_id: AccountOwner,
+        wave_number: u32,
+    },
+
+    /// Player damaged notification (game chain -> all player chains)
+    PlayerDamagedNotification {
+        game_id: String,
+        player_id: AccountOwner,
+        damage: u32,
+        remaining_health: u32,
+    },
+
+    /// Player defeated notification (game chain -> all player chains)
+    PlayerDefeatedNotification {
+        game_id: String,
+        player_id: AccountOwner,
+    },
+
     /// Game tick for processing game logic
     GameTick { delta_time_micros: u64 },
 
+    // ===== Game End Messages =====
+    /// Game victory notification (game chain -> all player chains)
+    GameVictoryNotification {
+        game_id: String,
+        winner: Option<AccountOwner>,
+        final_rankings: Vec<(AccountOwner, u32)>,
+    },
+
     /// Report final scores to master chain (game chain -> master chain)
     ReportScore { scores: Vec<PlayerScore> },
+
+    // ===== State Sync Messages =====
+    /// Full game state sync (game chain -> player chain)
+    SyncGameState { game_id: String },
 }
 
 /// Events emitted by the application
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TowerDefenseEvent {
+    // ===== Lobby Events =====
+    GameCreated {
+        game_id: String,
+        host: AccountOwner,
+        mode: GameMode,
+    },
+
+    PlayerJoined {
+        game_id: String,
+        player_id: AccountOwner,
+        player_name: String,
+    },
+
+    PlayerLeft {
+        game_id: String,
+        player_id: AccountOwner,
+    },
+
+    PlayerReadyChanged {
+        game_id: String,
+        player_id: AccountOwner,
+        ready: bool,
+    },
+
+    GameStarted {
+        game_id: String,
+        player_count: u8,
+    },
+
+    // ===== Gameplay Events =====
     TowerPlaced {
         tower_id: u64,
         tower: Tower,
+        player_id: Option<AccountOwner>,
     },
 
     TowerUpgraded {
@@ -105,6 +242,7 @@ pub enum TowerDefenseEvent {
     WaveStarted {
         wave_number: u32,
         enemy_count: usize,
+        player_id: Option<AccountOwner>,
     },
 
     WaveCompleted {
@@ -112,9 +250,28 @@ pub enum TowerDefenseEvent {
         bonus_gold: u64,
     },
 
+    PlayerHealthChanged {
+        game_id: String,
+        player_id: AccountOwner,
+        health: u32,
+    },
+
+    PlayerDefeated {
+        game_id: String,
+        player_id: AccountOwner,
+    },
+
+    // ===== Game End Events =====
     GameOver {
         victory: bool,
         final_wave: u32,
+        winner: Option<AccountOwner>,
+    },
+
+    GameEnded {
+        game_id: String,
+        winner: Option<AccountOwner>,
+        final_rankings: Vec<(AccountOwner, u32)>,
     },
 }
 

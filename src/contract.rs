@@ -58,6 +58,7 @@ impl Contract for TowerDefenseContract {
         self.state.shared_gold.set(500);
         self.state.grid.set(Grid::new());
         self.state.room_info.set(RoomInfo::default());
+        self.state.multiplayer_game.set(None);
         self.state.game_tick_count.set(0);
         self.state.last_wave_start_time.set(0);
         self.state.season.set(Season {
@@ -78,6 +79,25 @@ impl Contract for TowerDefenseContract {
 
         match operation {
             Operation::FindGame {} => self.handle_find_game(owner, chain_id).await,
+
+            Operation::CreateGame {
+                mode,
+                max_players,
+                is_private,
+            } => {
+                self.handle_create_game(owner, chain_id, mode, max_players, is_private)
+                    .await
+            }
+
+            Operation::JoinGame { game_id } => {
+                self.handle_join_game(owner, chain_id, game_id).await
+            }
+
+            Operation::SetPlayerReady { ready } => {
+                self.handle_set_player_ready(owner, ready).await
+            }
+
+            Operation::LeaveGame {} => self.handle_leave_game(owner).await,
 
             Operation::PlaceTower {
                 position_x,
@@ -113,12 +133,123 @@ impl Contract for TowerDefenseContract {
                 self.handle_find_game_result(game_chain).await;
             }
 
+            Message::CreateGameRequest {
+                mode,
+                max_players,
+                is_private,
+                player_name,
+                user_chain,
+            } => {
+                self.handle_create_game_request(
+                    mode,
+                    max_players,
+                    is_private,
+                    player_name,
+                    user_chain,
+                )
+                .await;
+            }
+
+            Message::CreateGameResult { game_id, success } => {
+                self.handle_create_game_result(game_id, success).await;
+            }
+
+            Message::JoinGameRequest {
+                game_id,
+                player_name,
+                user_chain,
+            } => {
+                self.handle_join_game_request(game_id, player_name, user_chain)
+                    .await;
+            }
+
+            Message::JoinGameResult {
+                game_id,
+                success,
+                error,
+            } => {
+                self.handle_join_game_result(game_id, success, error).await;
+            }
+
+            Message::PlayerReadyUpdate {
+                game_id,
+                player_id,
+                ready,
+            } => {
+                self.handle_player_ready_update(game_id, player_id, ready)
+                    .await;
+            }
+
+            Message::StartGameRequest { game_id } => {
+                self.handle_start_game_request(game_id).await;
+            }
+
+            Message::LeaveGameRequest {
+                game_id,
+                player_id,
+            } => {
+                self.handle_leave_game_request(game_id, player_id).await;
+            }
+
+            Message::TowerPlacedNotification {
+                game_id,
+                player_id,
+                tower_id,
+                position,
+                tower_type,
+            } => {
+                self.handle_tower_placed_notification(
+                    game_id, player_id, tower_id, position, tower_type,
+                )
+                .await;
+            }
+
+            Message::WaveStartedNotification {
+                game_id,
+                player_id,
+                wave_number,
+            } => {
+                self.handle_wave_started_notification(game_id, player_id, wave_number)
+                    .await;
+            }
+
+            Message::PlayerDamagedNotification {
+                game_id,
+                player_id,
+                damage,
+                remaining_health,
+            } => {
+                self.handle_player_damaged_notification(game_id, player_id, damage, remaining_health)
+                    .await;
+            }
+
+            Message::PlayerDefeatedNotification {
+                game_id,
+                player_id,
+            } => {
+                self.handle_player_defeated_notification(game_id, player_id)
+                    .await;
+            }
+
             Message::GameTick { delta_time_micros } => {
                 self.handle_game_tick(delta_time_micros).await;
             }
 
+            Message::GameVictoryNotification {
+                game_id,
+                winner,
+                final_rankings,
+            } => {
+                self.handle_game_victory_notification(game_id, winner, final_rankings)
+                    .await;
+            }
+
             Message::ReportScore { scores } => {
                 self.handle_report_score(scores).await;
+            }
+
+            Message::SyncGameState { game_id } => {
+                self.handle_sync_game_state(game_id).await;
             }
         }
     }
@@ -130,6 +261,122 @@ impl Contract for TowerDefenseContract {
 
 impl TowerDefenseContract {
     // ===== Operation Handlers =====
+
+    async fn handle_create_game(
+        &mut self,
+        owner: AccountOwner,
+        user_chain: ChainId,
+        mode: GameMode,
+        max_players: u8,
+        is_private: bool,
+    ) -> OperationResponse {
+        // Get player profile for name
+        let profile = self.state.profile.get();
+        let player_name = if profile.name.is_empty() {
+            format!("Player_{}", &format!("{:?}", owner)[..8])
+        } else {
+            profile.name.clone()
+        };
+
+        // Send CreateGameRequest to game chain (self)
+        let game_chain = self.runtime.chain_id();
+        self.send_message(
+            game_chain,
+            Message::CreateGameRequest {
+                mode,
+                max_players,
+                is_private,
+                player_name,
+                user_chain,
+            },
+        );
+
+        // Update user status
+        self.state.user_status.set(UserStatus::FindingGame);
+
+        OperationResponse::Ok
+    }
+
+    async fn handle_join_game(
+        &mut self,
+        owner: AccountOwner,
+        user_chain: ChainId,
+        game_id: String,
+    ) -> OperationResponse {
+        // Get player profile for name
+        let profile = self.state.profile.get();
+        let player_name = if profile.name.is_empty() {
+            format!("Player_{}", &format!("{:?}", owner)[..8])
+        } else {
+            profile.name.clone()
+        };
+
+        // Get game chain from current_game_chain or use self chain
+        let game_chain = self
+            .state
+            .current_game_chain
+            .get()
+            .as_ref()
+            .copied()
+            .unwrap_or(self.runtime.chain_id());
+
+        // Send JoinGameRequest to game chain
+        self.send_message(
+            game_chain,
+            Message::JoinGameRequest {
+                game_id,
+                player_name,
+                user_chain,
+            },
+        );
+
+        // Update user status
+        self.state.user_status.set(UserStatus::FindingGame);
+
+        OperationResponse::Ok
+    }
+
+    async fn handle_set_player_ready(
+        &mut self,
+        owner: AccountOwner,
+        ready: bool,
+    ) -> OperationResponse {
+        // Get current game info
+        let game_chain = self
+            .state
+            .current_game_chain
+            .get()
+            .as_ref()
+            .copied()
+            .unwrap_or(self.runtime.chain_id());
+
+        // Get multiplayer game to extract game_id
+        let mp_game = self.state.multiplayer_game.get();
+        let game_id = match mp_game.as_ref() {
+            Some(game) => game.game_id.clone(),
+            None => return OperationResponse::Ok, // No active game
+        };
+
+        // Send PlayerReadyUpdate to game chain
+        self.send_message(
+            game_chain,
+            Message::PlayerReadyUpdate {
+                game_id,
+                player_id: owner,
+                ready,
+            },
+        );
+
+        OperationResponse::PlayerReadyUpdated { ready }
+    }
+
+    async fn handle_leave_game(&mut self, _owner: AccountOwner) -> OperationResponse {
+        // Reset user status
+        self.state.user_status.set(UserStatus::Idle);
+        self.state.current_game_chain.set(None);
+
+        OperationResponse::LeftGame
+    }
 
     async fn handle_find_game(
         &mut self,
@@ -259,6 +506,7 @@ impl TowerDefenseContract {
         self.emit_event(TowerDefenseEvent::TowerPlaced {
             tower_id: tower_id as u64,
             tower: tower.clone(),
+            player_id: Some(owner),
         });
 
         OperationResponse::TowerPlaced {
@@ -429,6 +677,7 @@ impl TowerDefenseContract {
         self.emit_event(TowerDefenseEvent::WaveStarted {
             wave_number: new_wave,
             enemy_count,
+            player_id: None, // Single player or game chain initiated
         });
 
         // Schedule game tick
@@ -750,6 +999,7 @@ impl TowerDefenseContract {
         self.emit_event(TowerDefenseEvent::GameOver {
             victory,
             final_wave: wave_number,
+            winner: None, // Would need to determine winner in multiplayer
         });
 
         // Collect player scores
@@ -817,6 +1067,359 @@ impl TowerDefenseContract {
                 .insert(&score.owner, entry)
                 .expect("Failed to update leaderboard");
         }
+    }
+
+    // ===== Multiplayer Message Handlers =====
+
+    async fn handle_create_game_request(
+        &mut self,
+        mode: GameMode,
+        max_players: u8,
+        is_private: bool,
+        player_name: String,
+        user_chain: ChainId,
+    ) {
+        // This runs on game chain
+        // Generate unique game ID
+        let game_id = format!(
+            "game_{}_{:?}",
+            self.runtime.system_time().micros(),
+            self.runtime.chain_id()
+        );
+
+        // Get player owner from authenticated signer (would need proper handling)
+        let owner = AccountOwner::from([0u8; 32]); // Placeholder
+
+        // Create multiplayer game
+        let mp_game = MultiplayerGame::new(game_id.clone(), mode, max_players, owner);
+        self.state.multiplayer_game.set(Some(mp_game.clone()));
+
+        // Initialize first player stats
+        let mut stats = PlayerGameStats::new(owner, user_chain, player_name.clone());
+        stats.is_ready = false;
+        self.state
+            .players
+            .insert(&owner, stats)
+            .expect("Failed to insert player");
+
+        // Update room info
+        let mut room = self.state.room_info.get().clone();
+        room.game_chain = Some(self.runtime.chain_id());
+        room.player_count = 1;
+        room.max_players = max_players;
+        room.game_mode = mode;
+        room.host_name = player_name.clone();
+        room.is_public = !is_private;
+        self.state.room_info.set(room);
+
+        // Send success response to user chain
+        self.send_message(
+            user_chain,
+            Message::CreateGameResult {
+                game_id: game_id.clone(),
+                success: true,
+            },
+        );
+
+        // Emit event
+        self.emit_event(TowerDefenseEvent::GameCreated {
+            game_id,
+            host: owner,
+            mode,
+        });
+    }
+
+    async fn handle_create_game_result(&mut self, game_id: String, success: bool) {
+        // This runs on user chain
+        if success {
+            self.state.user_status.set(UserStatus::InGame);
+            // Store game ID in profile or separate field if needed
+            let _ = game_id; // Use game_id as needed
+        } else {
+            self.state.user_status.set(UserStatus::Idle);
+        }
+    }
+
+    async fn handle_join_game_request(
+        &mut self,
+        game_id: String,
+        player_name: String,
+        user_chain: ChainId,
+    ) {
+        // This runs on game chain
+        let mp_game = self.state.multiplayer_game.get();
+        let mut game = match mp_game.as_ref() {
+            Some(g) if g.game_id == game_id => g.clone(),
+            _ => {
+                // Game not found or wrong game ID
+                self.send_message(
+                    user_chain,
+                    Message::JoinGameResult {
+                        game_id: game_id.clone(),
+                        success: false,
+                        error: Some("Game not found".to_string()),
+                    },
+                );
+                return;
+            }
+        };
+
+        // Check if game is full
+        let current_players = self
+            .state
+            .players
+            .count()
+            .await
+            .expect("Failed to count players");
+        if current_players >= game.max_players as usize {
+            self.send_message(
+                user_chain,
+                Message::JoinGameResult {
+                    game_id: game_id.clone(),
+                    success: false,
+                    error: Some("Game is full".to_string()),
+                },
+            );
+            return;
+        }
+
+        // Check if game already started
+        if game.status != GameStatus::Lobby {
+            self.send_message(
+                user_chain,
+                Message::JoinGameResult {
+                    game_id: game_id.clone(),
+                    success: false,
+                    error: Some("Game already started".to_string()),
+                },
+            );
+            return;
+        }
+
+        // Add player
+        let owner = AccountOwner::from([0u8; 32]); // Placeholder - would need proper owner from message
+        let stats = PlayerGameStats::new(owner, user_chain, player_name.clone());
+        self.state
+            .players
+            .insert(&owner, stats)
+            .expect("Failed to insert player");
+
+        // Update room info
+        let mut room = self.state.room_info.get().clone();
+        room.player_count = room.player_count.saturating_add(1);
+        self.state.room_info.set(room);
+
+        // Send success response
+        self.send_message(
+            user_chain,
+            Message::JoinGameResult {
+                game_id: game_id.clone(),
+                success: true,
+                error: None,
+            },
+        );
+
+        // Emit event
+        self.emit_event(TowerDefenseEvent::PlayerJoined {
+            game_id,
+            player_id: owner,
+            player_name,
+        });
+    }
+
+    async fn handle_join_game_result(
+        &mut self,
+        game_id: String,
+        success: bool,
+        error: Option<String>,
+    ) {
+        // This runs on user chain
+        if success {
+            self.state.user_status.set(UserStatus::InGame);
+            let _ = game_id; // Use game_id as needed
+        } else {
+            self.state.user_status.set(UserStatus::Idle);
+            let _ = error; // Log or display error
+        }
+    }
+
+    async fn handle_player_ready_update(
+        &mut self,
+        game_id: String,
+        player_id: AccountOwner,
+        ready: bool,
+    ) {
+        // This runs on game chain
+        // Update player ready status
+        let mut stats = match self
+            .state
+            .players
+            .get(&player_id)
+            .await
+            .expect("Failed to get player stats")
+        {
+            Some(s) => s,
+            None => return,
+        };
+
+        stats.is_ready = ready;
+        self.state
+            .players
+            .insert(&player_id, stats)
+            .expect("Failed to update player stats");
+
+        // Emit event
+        self.emit_event(TowerDefenseEvent::PlayerReadyChanged {
+            game_id,
+            player_id,
+            ready,
+        });
+
+        // Check if all players are ready
+        self.check_all_players_ready().await;
+    }
+
+    async fn check_all_players_ready(&mut self) {
+        let player_ids: Vec<AccountOwner> = self
+            .state
+            .players
+            .indices()
+            .await
+            .expect("Failed to get player indices");
+
+        let mut all_ready = true;
+        let player_count = player_ids.len();
+
+        for owner in player_ids {
+            let stats = self
+                .state
+                .players
+                .get(&owner)
+                .await
+                .expect("Failed to get player stats")
+                .expect("Player not found");
+            if !stats.is_ready {
+                all_ready = false;
+                break;
+            }
+        }
+
+        // Only start if all players ready and at least 2 players
+        if all_ready && player_count >= 2 {
+            let mp_game = self.state.multiplayer_game.get();
+            if let Some(mut game) = mp_game.as_ref().cloned() {
+                game.status = GameStatus::InProgress;
+                game.start_time = self.runtime.system_time().micros();
+                self.state.multiplayer_game.set(Some(game.clone()));
+
+                // Emit event
+                self.emit_event(TowerDefenseEvent::GameStarted {
+                    game_id: game.game_id,
+                    player_count: player_count as u8,
+                });
+            }
+        }
+    }
+
+    async fn handle_start_game_request(&mut self, game_id: String) {
+        // This runs on game chain - host forcing start
+        let mp_game = self.state.multiplayer_game.get();
+        if let Some(mut game) = mp_game.as_ref().cloned() {
+            if game.game_id == game_id && game.status == GameStatus::Lobby {
+                game.status = GameStatus::InProgress;
+                game.start_time = self.runtime.system_time().micros();
+                self.state.multiplayer_game.set(Some(game.clone()));
+
+                let player_count = self
+                    .state
+                    .players
+                    .count()
+                    .await
+                    .expect("Failed to count players");
+
+                self.emit_event(TowerDefenseEvent::GameStarted {
+                    game_id: game.game_id,
+                    player_count: player_count as u8,
+                });
+            }
+        }
+    }
+
+    async fn handle_leave_game_request(&mut self, game_id: String, player_id: AccountOwner) {
+        // This runs on game chain
+        // Remove player from game
+        self.state
+            .players
+            .remove(&player_id)
+            .expect("Failed to remove player");
+
+        // Update room info
+        let mut room = self.state.room_info.get().clone();
+        room.player_count = room.player_count.saturating_sub(1);
+        self.state.room_info.set(room);
+
+        // Emit event
+        self.emit_event(TowerDefenseEvent::PlayerLeft {
+            game_id,
+            player_id,
+        });
+    }
+
+    async fn handle_tower_placed_notification(
+        &mut self,
+        _game_id: String,
+        _player_id: AccountOwner,
+        _tower_id: u64,
+        _position: (u8, u8),
+        _tower_type: TowerType,
+    ) {
+        // This runs on user chains - update local UI state
+        // Frontend will handle this via polling or subscriptions
+    }
+
+    async fn handle_wave_started_notification(
+        &mut self,
+        _game_id: String,
+        _player_id: AccountOwner,
+        _wave_number: u32,
+    ) {
+        // This runs on user chains - update local UI state
+        // Frontend will handle this via polling or subscriptions
+    }
+
+    async fn handle_player_damaged_notification(
+        &mut self,
+        _game_id: String,
+        _player_id: AccountOwner,
+        _damage: u32,
+        _remaining_health: u32,
+    ) {
+        // This runs on user chains - update local UI state
+        // Frontend will handle this via polling or subscriptions
+    }
+
+    async fn handle_player_defeated_notification(
+        &mut self,
+        _game_id: String,
+        _player_id: AccountOwner,
+    ) {
+        // This runs on user chains - update local UI state
+        // Frontend will handle this via polling or subscriptions
+    }
+
+    async fn handle_game_victory_notification(
+        &mut self,
+        _game_id: String,
+        _winner: Option<AccountOwner>,
+        _final_rankings: Vec<(AccountOwner, u32)>,
+    ) {
+        // This runs on user chains - display victory screen
+        // Frontend will handle this via polling or subscriptions
+    }
+
+    async fn handle_sync_game_state(&mut self, _game_id: String) {
+        // This runs on user chains - sync full game state
+        // Would query game chain for full state
     }
 
     // ===== Helper Methods =====

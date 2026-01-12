@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tower Defense - Multiplayer Lobby</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="multiplayer.css">
+</head>
+<body>
+    <div class="lobby-container">
+        <!-- Header -->
+        <header class="lobby-header">
+            <h1>🏰 Multiplayer Lobby</h1>
+            <button id="back-to-menu" class="btn btn-secondary" aria-label="Back to main menu">
+                ← Back to Menu
+            </button>
+        </header>
+
+        <!-- Main Lobby Content -->
+        <div class="lobby-content">
+            <!-- Left Panel: Game List -->
+            <section class="game-list-panel" role="region" aria-label="Available games">
+                <div class="panel-header">
+                    <h2>Available Games</h2>
+                    <button id="refresh-games" class="btn btn-small" aria-label="Refresh game list">
+                        🔄 Refresh
+                    </button>
+                </div>
+
+                <!-- Filter Tabs -->
+                <div class="game-mode-filters" role="tablist">
+                    <button class="filter-tab active" data-mode="all" role="tab" aria-selected="true">
+                        All
+                    </button>
+                    <button class="filter-tab" data-mode="Versus" role="tab" aria-selected="false">
+                        ⚔️ Versus
+                    </button>
+                    <button class="filter-tab" data-mode="CoOp" role="tab" aria-selected="false">
+                        🤝 Co-op
+                    </button>
+                    <button class="filter-tab" data-mode="Race" role="tab" aria-selected="false">
+                        🏁 Race
+                    </button>
+                    <button class="filter-tab" data-mode="HighScore" role="tab" aria-selected="false">
+                        🏆 High Score
+                    </button>
+                </div>
+
+                <!-- Game Listings -->
+                <div id="game-listings" class="game-listings" role="list">
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Loading games...</p>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="quick-actions">
+                    <button id="quick-match" class="btn btn-primary" aria-label="Find a quick match">
+                        ⚡ Quick Match
+                    </button>
+                    <button id="create-game" class="btn btn-success" aria-label="Create new game">
+                        ➕ Create Game
+                    </button>
+                </div>
+            </section>
+
+            <!-- Right Panel: Game Room -->
+            <section class="game-room-panel" id="game-room" role="region" aria-label="Game room">
+                <div class="empty-state" id="empty-room">
+                    <div class="empty-icon">🎮</div>
+                    <h3>No Game Selected</h3>
+                    <p>Select a game from the list or create a new one</p>
+                </div>
+
+                <!-- Active Game Room -->
+                <div class="active-room" id="active-room" style="display: none;">
+                    <!-- Room Header -->
+                    <div class="room-header">
+                        <div class="room-info">
+                            <h2 id="room-title">Game Lobby</h2>
+                            <div class="room-meta">
+                                <span class="room-mode-badge" id="room-mode-badge">Versus</span>
+                                <span class="room-id" id="room-id">Game #abc123</span>
+                            </div>
+                        </div>
+                        <button id="leave-room" class="btn btn-danger btn-small" aria-label="Leave game">
+                            ← Leave
+                        </button>
+                    </div>
+
+                    <!-- Player Slots -->
+                    <div class="player-slots" role="list" aria-label="Player slots">
+                        <div class="player-slot" id="player-slot-1" data-slot="1">
+                            <div class="slot-number">1</div>
+                            <div class="player-info">
+                                <div class="player-avatar">🎮</div>
+                                <div class="player-details">
+                                    <div class="player-name">Empty Slot</div>
+                                    <div class="player-status">Waiting...</div>
+                                </div>
+                            </div>
+                            <div class="player-ready-indicator" aria-label="Not ready">
+                                <span class="ready-icon">⏳</span>
+                            </div>
+                        </div>
+
+                        <div class="player-slot" id="player-slot-2" data-slot="2">
+                            <div class="slot-number">2</div>
+                            <div class="player-info">
+                                <div class="player-avatar">🎮</div>
+                                <div class="player-details">
+                                    <div class="player-name">Empty Slot</div>
+                                    <div class="player-status">Waiting...</div>
+                                </div>
+                            </div>
+                            <div class="player-ready-indicator" aria-label="Not ready">
+                                <span class="ready-icon">⏳</span>
+                            </div>
+                        </div>
+
+                        <div class="player-slot" id="player-slot-3" data-slot="3">
+                            <div class="slot-number">3</div>
+                            <div class="player-info">
+                                <div class="player-avatar">🎮</div>
+                                <div class="player-details">
+                                    <div class="player-name">Empty Slot</div>
+                                    <div class="player-status">Waiting...</div>
+                                </div>
+                            </div>
+                            <div class="player-ready-indicator" aria-label="Not ready">
+                                <span class="ready-icon">⏳</span>
+                            </div>
+                        </div>
+
+                        <div class="player-slot" id="player-slot-4" data-slot="4">
+                            <div class="slot-number">4</div>
+                            <div class="player-info">
+                                <div class="player-avatar">🎮</div>
+                                <div class="player-details">
+                                    <div class="player-name">Empty Slot</div>
+                                    <div class="player-status">Waiting...</div>
+                                </div>
+                            </div>
+                            <div class="player-ready-indicator" aria-label="Not ready">
+                                <span class="ready-icon">⏳</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Game Settings -->
+                    <div class="game-settings">
+                        <h3>Game Settings</h3>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <label>Mode:</label>
+                                <span id="setting-mode">Versus</span>
+                            </div>
+                            <div class="setting-item">
+                                <label>Max Players:</label>
+                                <span id="setting-max-players">4</span>
+                            </div>
+                            <div class="setting-item">
+                                <label>Map:</label>
+                                <span id="setting-map">Classic Path</span>
+                            </div>
+                            <div class="setting-item">
+                                <label>Visibility:</label>
+                                <span id="setting-visibility">Public</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ready Button -->
+                    <div class="room-actions">
+                        <button id="ready-button" class="btn btn-primary btn-large" aria-label="Toggle ready status">
+                            Ready Up
+                        </button>
+                        <button id="start-game-button" class="btn btn-success btn-large" style="display: none;" aria-label="Start game">
+                            Start Game
+                        </button>
+                    </div>
+
+                    <!-- Room Status -->
+                    <div class="room-status" id="room-status">
+                        <span class="status-text">Waiting for players...</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Create Game Modal -->
+    <div id="create-game-modal" class="modal" role="dialog" aria-labelledby="modal-title" aria-hidden="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Create New Game</h2>
+                <button class="modal-close" aria-label="Close modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="create-game-form">
+                    <div class="form-group">
+                        <label for="game-mode-select">Game Mode</label>
+                        <select id="game-mode-select" class="form-control" required>
+                            <option value="Versus">⚔️ Versus - Last Player Standing</option>
+                            <option value="CoOp">🤝 Co-op - Team Survival</option>
+                            <option value="Race">🏁 Race - First to Wave 20</option>
+                            <option value="HighScore">🏆 High Score - Best Score Wins</option>
+                        </select>
+                        <div class="mode-description" id="mode-description">
+                            Compete against other players. Last survivor wins!
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="max-players-select">Max Players</label>
+                        <select id="max-players-select" class="form-control" required>
+                            <option value="2">2 Players</option>
+                            <option value="3">3 Players</option>
+                            <option value="4" selected>4 Players</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="private-game-checkbox">
+                            <span>Private Game (invite only)</span>
+                        </label>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success">Create Game</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="multiplayer.js"></script>
+    <script>
+        // Initialize lobby on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            window.LobbyManager.init();
+        });
+    </script>
+</body>
+</html>

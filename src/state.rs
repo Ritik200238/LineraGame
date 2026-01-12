@@ -71,6 +71,12 @@ pub struct TowerDefenseState {
     /// Room info (for public discovery)
     pub room_info: RegisterView<RoomInfo>,
 
+    /// Multiplayer game state (for play chains)
+    pub multiplayer_game: RegisterView<Option<MultiplayerGame>>,
+
+    /// Active game listings (for public chains)
+    pub game_listings: MapView<String, GameListing>,
+
     // ===== Public Chain Fields =====
     /// Active game chains grouped by player count
     pub games_by_player_count: MapView<u8, Vec<ChainId>>,
@@ -93,11 +99,40 @@ pub enum UserStatus {
     FindingGame,
     GameFound,
     InGame,
+    Spectating,
 }
 
 impl Default for UserStatus {
     fn default() -> Self {
         Self::Idle
+    }
+}
+
+/// Multiplayer game modes
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum GameMode {
+    Versus,      // Last player standing wins
+    CoOp,        // All players share lives, work together
+    Race,        // First to wave 20 wins
+    HighScore,   // Highest score after 10 waves wins
+}
+
+impl Default for GameMode {
+    fn default() -> Self {
+        Self::Versus
+    }
+}
+
+/// Wave synchronization mode
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum WaveSyncMode {
+    Independent,  // Each player controls their own wave timing
+    Synchronized, // All players progress waves together
+}
+
+impl Default for WaveSyncMode {
+    fn default() -> Self {
+        Self::Independent
     }
 }
 
@@ -130,21 +165,37 @@ impl Default for PlayerProfile {
 pub struct PlayerGameStats {
     pub owner: AccountOwner,
     pub chain_id: ChainId,
+    pub player_name: String,
+    pub player_health: u32,
+    pub player_gold: u64,
+    pub current_wave: u32,
+    pub score: u32,
     pub kills: u32,
     pub damage_dealt: u64,
     pub towers_placed: Vec<u64>,
     pub gold_spent: u64,
+    pub is_alive: bool,
+    pub is_ready: bool,
+    pub last_action_timestamp: u64,
 }
 
 impl PlayerGameStats {
-    pub fn new(owner: AccountOwner, chain_id: ChainId) -> Self {
+    pub fn new(owner: AccountOwner, chain_id: ChainId, name: String) -> Self {
         Self {
             owner,
             chain_id,
+            player_name: name,
+            player_health: 20,
+            player_gold: 500,
+            current_wave: 0,
+            score: 0,
             kills: 0,
             damage_dealt: 0,
             towers_placed: Vec::new(),
             gold_spent: 0,
+            is_alive: true,
+            is_ready: false,
+            last_action_timestamp: 0,
         }
     }
 }
@@ -166,6 +217,8 @@ pub struct RoomInfo {
     pub max_players: u8,
     pub wave_number: u32,
     pub is_public: bool,
+    pub game_mode: GameMode,
+    pub host_name: String,
 }
 
 impl Default for RoomInfo {
@@ -176,8 +229,58 @@ impl Default for RoomInfo {
             max_players: 4,
             wave_number: 0,
             is_public: true,
+            game_mode: GameMode::default(),
+            host_name: String::new(),
         }
     }
+}
+
+/// Multiplayer game state (stored on play chain)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultiplayerGame {
+    pub game_id: String,
+    pub mode: GameMode,
+    pub status: GameStatus,
+    pub max_players: u8,
+    pub wave_sync_mode: WaveSyncMode,
+    pub start_time: u64,
+    pub winner: Option<AccountOwner>,
+    pub final_rankings: Vec<(AccountOwner, u32)>,
+    pub host: AccountOwner,
+}
+
+impl MultiplayerGame {
+    pub fn new(game_id: String, mode: GameMode, max_players: u8, host: AccountOwner) -> Self {
+        let wave_sync_mode = match mode {
+            GameMode::Versus | GameMode::Race => WaveSyncMode::Independent,
+            GameMode::CoOp | GameMode::HighScore => WaveSyncMode::Synchronized,
+        };
+
+        Self {
+            game_id,
+            mode,
+            status: GameStatus::Lobby,
+            max_players,
+            wave_sync_mode,
+            start_time: 0,
+            winner: None,
+            final_rankings: Vec::new(),
+            host,
+        }
+    }
+}
+
+/// Game listing for public matchmaking
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameListing {
+    pub game_id: String,
+    pub game_chain: ChainId,
+    pub mode: GameMode,
+    pub current_players: u8,
+    pub max_players: u8,
+    pub status: GameStatus,
+    pub host_name: String,
+    pub is_private: bool,
 }
 
 /// Leaderboard entry (stored on master chain)
