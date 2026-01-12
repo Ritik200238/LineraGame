@@ -32,6 +32,9 @@ const gameState = {
     },
 };
 
+// Expose gameState to window for debugging and testing
+window.gameState = gameState;
+
 // ===== Tower Definitions with Cartoon Graphics =====
 const TOWER_TYPES = {
     Arrow: {

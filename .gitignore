@@ -1,30 +1,14 @@
-# Generated files
-target/
-*.wasm
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Linera
-.linera/
-*.wallet
-
-# Node
 node_modules/
-package-lock.json
-
-# Logs
+.DS_Store
 *.log
-
-# Build artifacts
-*.o
-*.a
-*.dylib
-*.so
+.env
+.cache/
+tmp*
+.playwright-browsers/
+playwright-report/
+test-results/
+*.backup
+target/
+Cargo.lock
+.vscode/
+.idea/
