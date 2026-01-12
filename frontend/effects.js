@@ -339,6 +339,22 @@ const EffectsManager = {
         }
     },
 
+    // ===== Particle Creation (God-level Enhancement) =====
+    createParticle(x, y, angle, color = '#FFD700') {
+        const speed = 3 + Math.random() * 2;
+        this.particles.push({
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1,
+            color: color,
+            size: 4 + Math.random() * 3,
+            gravity: 0.15,
+            type: 'burst'
+        });
+    },
+
     // ===== Impact Effects =====
     createImpact(x, y, type = 'bullet') {
         const color = this.getProjectileColor(type);
