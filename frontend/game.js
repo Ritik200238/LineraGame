@@ -354,12 +354,21 @@ function placeTowerDemo(x, y, towerType, towerDef) {
     };
     gameState.towers.push(tower);
 
-    // Update cell with tower sprite
+    // Update cell with tower sprite and god-level animation
     const cell = document.querySelector(`.grid-cell[data-x="${x}"][data-y="${y}"]`);
     if (cell) {
         cell.classList.add('tower');
         cell.classList.remove('grass-tuft', 'rock');
-        cell.innerHTML = `<span class="tower-sprite" data-tower-id="${tower.id}">${towerDef.sprite}</span>`;
+        cell.innerHTML = `<span class="tower-sprite placed" data-tower-id="${tower.id}" role="img" aria-label="${towerType} tower">${towerDef.sprite}</span>`;
+
+        // Particle burst effect
+        if (window.EffectsManager) {
+            const pos = window.EffectsManager.getCellCenter(x, y);
+            for (let i = 0; i < 12; i++) {
+                const angle = (Math.PI * 2 * i) / 12;
+                window.EffectsManager.createParticle(pos.x, pos.y, angle, towerDef.color);
+            }
+        }
     }
 
     // Update UI
@@ -381,12 +390,37 @@ function updateUI() {
     const enemyCount = document.getElementById('enemy-count');
     const towerCount = document.getElementById('tower-count');
 
-    if (goldDisplay) goldDisplay.textContent = gameState.gold;
-    if (healthDisplay) healthDisplay.textContent = gameState.health;
-    if (waveDisplay) waveDisplay.textContent = gameState.wave;
-    if (statusDisplay) statusDisplay.textContent = gameState.gameStatus;
-    if (enemyCount) enemyCount.textContent = gameState.enemies.length;
-    if (towerCount) towerCount.textContent = gameState.towers.length;
+    // God-level number formatting with separators
+    if (goldDisplay) {
+        goldDisplay.textContent = gameState.gold.toLocaleString();
+        goldDisplay.setAttribute('aria-label', `${gameState.gold} gold`);
+    }
+    if (healthDisplay) {
+        healthDisplay.textContent = gameState.health;
+        healthDisplay.setAttribute('aria-label', `${gameState.health} health remaining`);
+        // Critical health warning
+        if (gameState.health <= 5) {
+            healthDisplay.classList.add('critical');
+        } else {
+            healthDisplay.classList.remove('critical');
+        }
+    }
+    if (waveDisplay) {
+        waveDisplay.textContent = gameState.wave;
+        waveDisplay.setAttribute('aria-label', `Wave ${gameState.wave}`);
+    }
+    if (statusDisplay) {
+        statusDisplay.textContent = gameState.gameStatus;
+        statusDisplay.setAttribute('aria-label', `Game status: ${gameState.gameStatus}`);
+    }
+    if (enemyCount) {
+        enemyCount.textContent = gameState.enemies.length;
+        enemyCount.setAttribute('aria-label', `${gameState.enemies.length} invaders`);
+    }
+    if (towerCount) {
+        towerCount.textContent = gameState.towers.length;
+        towerCount.setAttribute('aria-label', `${gameState.towers.length} defenders`);
+    }
 
     // Update button states (Web2 quality feedback)
     const startWaveBtn = document.getElementById('start-wave-btn');
@@ -621,12 +655,20 @@ function endWave() {
     gameState.gameStatus = 'Preparing';
     const bonus = 50 + gameState.wave * 10;
     gameState.gold += bonus;
+
+    // God-level celebration animation!
+    const container = document.querySelector('.game-container');
+    if (container) {
+        container.classList.add('celebrating');
+        setTimeout(() => container.classList.remove('celebrating'), 600);
+    }
+
     updateUI();
 
     if (window.AnnouncementSystem) {
         window.AnnouncementSystem.show('WAVE CLEARED! 🎉', 2500);
     }
-    showToast(`Wave ${gameState.wave} complete! +${bonus} gold`, 'success');
+    showToast(`Wave ${gameState.wave} complete! +${bonus.toLocaleString()} gold`, 'success');
 }
 
 function moveEnemy(enemy) {
@@ -643,10 +685,18 @@ function moveEnemy(enemy) {
         enemy.pathIndex++;
 
         if (enemy.pathIndex >= gameState.path.length) {
-            // Enemy reached base
+            // Enemy reached base - god-level screen shake!
             gameState.health--;
             removeEnemy(enemy);
             clearInterval(moveInterval);
+
+            // Screen shake effect
+            const container = document.querySelector('.game-container');
+            if (container) {
+                container.classList.add('shake');
+                setTimeout(() => container.classList.remove('shake'), 500);
+            }
+
             updateUI();
 
             if (gameState.health <= 0) {
@@ -770,10 +820,14 @@ function renderEnemies() {
             const healthPercent = (enemy.health / enemy.maxHealth) * 100;
             const healthClass = healthPercent > 50 ? '' : healthPercent > 25 ? 'low' : 'critical';
 
+            // Check if enemy just spawned (first render)
+            const isNewSpawn = !cell.querySelector('.enemy-sprite');
+            const spawnClass = isNewSpawn ? 'spawning' : '';
+
             cell.innerHTML = `
-                <span class="enemy-sprite moving">${enemyDef?.sprite || '👾'}</span>
+                <span class="enemy-sprite moving ${spawnClass}" role="img" aria-label="${enemyDef?.name || 'enemy'}">${enemyDef?.sprite || '👾'}</span>
                 <div class="health-bar-container">
-                    <div class="health-bar-fill ${healthClass}" style="width: ${healthPercent}%"></div>
+                    <div class="health-bar-fill ${healthClass}" style="width: ${healthPercent}%" role="progressbar" aria-valuenow="${healthPercent}" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
             `;
         }
