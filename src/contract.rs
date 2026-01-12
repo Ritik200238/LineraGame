@@ -1,16 +1,15 @@
 #![cfg_attr(target_arch = "wasm32", no_main)]
 
+use crate::{
+    guards, state::*, Message, Operation, OperationResponse, TowerDefenseEvent,
+    TowerDefenseParameters,
+};
 use linera_sdk::{
-    linera_base_types::{ChainId, AccountOwner, Timestamp, WithContractAbi},
+    linera_base_types::{AccountOwner, ChainId, Timestamp, WithContractAbi},
     views::{RootView, View},
     Contract, ContractRuntime,
 };
 use tower_defense_abi::*;
-use crate::{
-    state::*,
-    guards,
-    Operation, OperationResponse, Message, TowerDefenseEvent, TowerDefenseParameters,
-};
 
 pub struct TowerDefenseContract {
     state: TowerDefenseState,
@@ -48,10 +47,9 @@ impl Contract for TowerDefenseContract {
             total_kills: 0,
             created_at: 0,
         });
-        self.state.unlocked_towers.set(vec![
-            TowerType::Arrow,
-            TowerType::Cannon,
-        ]);
+        self.state
+            .unlocked_towers
+            .set(vec![TowerType::Arrow, TowerType::Cannon]);
         self.state.game_config.set(GameConfig::default());
         self.state.game_status.set(GameStatus::Lobby);
         self.state.wave_number.set(0);
@@ -79,29 +77,29 @@ impl Contract for TowerDefenseContract {
         let chain_id = self.runtime.chain_id();
 
         match operation {
-            Operation::FindGame {} => {
-                self.handle_find_game(owner, chain_id).await
-            }
+            Operation::FindGame {} => self.handle_find_game(owner, chain_id).await,
 
-            Operation::PlaceTower { position_x, position_y, tower_type } => {
-                self.handle_place_tower(owner, (position_x, position_y), tower_type, current_time).await
+            Operation::PlaceTower {
+                position_x,
+                position_y,
+                tower_type,
+            } => {
+                self.handle_place_tower(owner, (position_x, position_y), tower_type, current_time)
+                    .await
             }
 
             Operation::UpgradeTower { tower_id } => {
                 self.handle_upgrade_tower(owner, tower_id).await
             }
 
-            Operation::SellTower { tower_id } => {
-                self.handle_sell_tower(owner, tower_id).await
-            }
+            Operation::SellTower { tower_id } => self.handle_sell_tower(owner, tower_id).await,
 
-            Operation::StartWave {} => {
-                self.handle_start_wave(current_time).await
-            }
+            Operation::StartWave {} => self.handle_start_wave(current_time).await,
 
-            Operation::AddPublicChain { public_chain_id, region } => {
-                self.handle_add_public_chain(public_chain_id, region).await
-            }
+            Operation::AddPublicChain {
+                public_chain_id,
+                region,
+            } => self.handle_add_public_chain(public_chain_id, region).await,
         }
     }
 
@@ -133,7 +131,11 @@ impl Contract for TowerDefenseContract {
 impl TowerDefenseContract {
     // ===== Operation Handlers =====
 
-    async fn handle_find_game(&mut self, _owner: AccountOwner, user_chain: ChainId) -> OperationResponse {
+    async fn handle_find_game(
+        &mut self,
+        _owner: AccountOwner,
+        user_chain: ChainId,
+    ) -> OperationResponse {
         // Validate state
         let status = self.state.user_status.get();
         if *status != UserStatus::Idle {
@@ -145,7 +147,9 @@ impl TowerDefenseContract {
 
         // Send message to public chain
         let params = self.runtime.application_parameters();
-        let public_chain = params.public_chains.first()
+        let public_chain = params
+            .public_chains
+            .first()
             .expect("No public chains configured");
 
         self.send_message(*public_chain, Message::FindGameRequest { user_chain });
@@ -161,7 +165,8 @@ impl TowerDefenseContract {
         current_time: Timestamp,
     ) -> OperationResponse {
         // 1. Check tower limit FIRST (cheap operation before expensive state reads)
-        guards::check_tower_limit(&self.state, owner).await
+        guards::check_tower_limit(&self.state, owner)
+            .await
             .map_err(|e| panic!("{}", e))
             .unwrap();
 
@@ -178,10 +183,18 @@ impl TowerDefenseContract {
         }
 
         // Check if position is occupied
-        let tower_ids = self.state.towers.indices().await
+        let tower_ids = self
+            .state
+            .towers
+            .indices()
+            .await
             .expect("Failed to get towers");
         for tower_id in tower_ids {
-            let tower = self.state.towers.get(&tower_id).await
+            let tower = self
+                .state
+                .towers
+                .get(&tower_id)
+                .await
                 .expect("Failed to get tower")
                 .expect("Tower not found");
             if tower.position == position {
@@ -207,30 +220,39 @@ impl TowerDefenseContract {
         self.state.shared_gold.set(gold);
 
         // Create tower
-        let tower_id = self.state.towers.count().await
+        let tower_id = self
+            .state
+            .towers
+            .count()
+            .await
             .expect("Failed to count towers");
-        let tower = Tower::new(
-            tower_id as u64,
-            position,
-            tower_type,
-            current_time.micros(),
-        );
+        let tower = Tower::new(tower_id as u64, position, tower_type, current_time.micros());
 
         // Save tower
-        self.state.towers.insert(&(tower_id as u64), tower.clone())
+        self.state
+            .towers
+            .insert(&(tower_id as u64), tower.clone())
             .expect("Failed to insert tower");
 
         // Store ownership (SECURITY FIX)
-        self.state.tower_owners.insert(&(tower_id as u64), owner)
+        self.state
+            .tower_owners
+            .insert(&(tower_id as u64), owner)
             .expect("Failed to store tower ownership");
 
         // Update player stats
-        let mut stats = self.state.players.get(&owner).await
+        let mut stats = self
+            .state
+            .players
+            .get(&owner)
+            .await
             .expect("Failed to get player stats")
             .unwrap_or_else(|| PlayerGameStats::new(owner, self.runtime.chain_id()));
         stats.towers_placed.push(tower_id as u64);
         stats.gold_spent = stats.gold_spent.saturating_add(cost);
-        self.state.players.insert(&owner, stats)
+        self.state
+            .players
+            .insert(&owner, stats)
             .expect("Failed to update player stats");
 
         // Emit event
@@ -239,22 +261,35 @@ impl TowerDefenseContract {
             tower: tower.clone(),
         });
 
-        OperationResponse::TowerPlaced { tower_id: tower_id as u64 }
+        OperationResponse::TowerPlaced {
+            tower_id: tower_id as u64,
+        }
     }
 
-    async fn handle_upgrade_tower(&mut self, owner: AccountOwner, tower_id: u64) -> OperationResponse {
+    async fn handle_upgrade_tower(
+        &mut self,
+        owner: AccountOwner,
+        tower_id: u64,
+    ) -> OperationResponse {
         // 1. Verify ownership FIRST (SECURITY FIX)
-        guards::ensure_tower_owner(&self.state, tower_id, owner).await
+        guards::ensure_tower_owner(&self.state, tower_id, owner)
+            .await
             .map_err(|e| panic!("{}", e))
             .unwrap();
 
         // Get tower
-        let mut tower = self.state.towers.get(&tower_id).await
+        let mut tower = self
+            .state
+            .towers
+            .get(&tower_id)
+            .await
             .expect("Failed to get tower")
             .expect("Tower not found");
 
         // Check upgrade cost
-        let cost = tower.tower_type.upgrade_cost(tower.level.saturating_add(1))
+        let cost = tower
+            .tower_type
+            .upgrade_cost(tower.level.saturating_add(1))
             .expect("Tower at max level or invalid level");
 
         // Check gold
@@ -271,15 +306,23 @@ impl TowerDefenseContract {
         tower.upgrade().expect("Failed to upgrade tower");
 
         // Save tower
-        self.state.towers.insert(&tower_id, tower.clone())
+        self.state
+            .towers
+            .insert(&tower_id, tower.clone())
             .expect("Failed to update tower");
 
         // Update player stats
-        let mut stats = self.state.players.get(&owner).await
+        let mut stats = self
+            .state
+            .players
+            .get(&owner)
+            .await
             .expect("Failed to get player stats")
             .expect("Player stats not found");
         stats.gold_spent = stats.gold_spent.saturating_add(cost);
-        self.state.players.insert(&owner, stats)
+        self.state
+            .players
+            .insert(&owner, stats)
             .expect("Failed to update player stats");
 
         // Emit event
@@ -288,17 +331,25 @@ impl TowerDefenseContract {
             new_level: tower.level,
         });
 
-        OperationResponse::TowerUpgraded { tower_id, new_level: tower.level }
+        OperationResponse::TowerUpgraded {
+            tower_id,
+            new_level: tower.level,
+        }
     }
 
     async fn handle_sell_tower(&mut self, owner: AccountOwner, tower_id: u64) -> OperationResponse {
         // 1. Verify ownership FIRST (SECURITY FIX)
-        guards::ensure_tower_owner(&self.state, tower_id, owner).await
+        guards::ensure_tower_owner(&self.state, tower_id, owner)
+            .await
             .map_err(|e| panic!("{}", e))
             .unwrap();
 
         // Get tower
-        let tower = self.state.towers.get(&tower_id).await
+        let tower = self
+            .state
+            .towers
+            .get(&tower_id)
+            .await
             .expect("Failed to get tower")
             .expect("Tower not found");
 
@@ -311,18 +362,19 @@ impl TowerDefenseContract {
         self.state.shared_gold.set(gold);
 
         // Remove tower
-        self.state.towers.remove(&tower_id)
+        self.state
+            .towers
+            .remove(&tower_id)
             .expect("Failed to remove tower");
 
         // Remove ownership record (SECURITY FIX)
-        self.state.tower_owners.remove(&tower_id)
+        self.state
+            .tower_owners
+            .remove(&tower_id)
             .expect("Failed to remove tower ownership");
 
         // Emit event
-        self.emit_event(TowerDefenseEvent::TowerSold {
-            tower_id,
-            refund,
-        });
+        self.emit_event(TowerDefenseEvent::TowerSold { tower_id, refund });
 
         OperationResponse::TowerSold { tower_id, refund }
     }
@@ -367,7 +419,9 @@ impl TowerDefenseContract {
         // Insert enemies
         for enemy in enemies {
             let id = enemy.id;
-            self.state.enemies.insert(&id, enemy)
+            self.state
+                .enemies
+                .insert(&id, enemy)
                 .expect("Failed to insert enemy");
         }
 
@@ -380,10 +434,16 @@ impl TowerDefenseContract {
         // Schedule game tick
         self.schedule_game_tick(100_000); // 100ms
 
-        OperationResponse::WaveStarted { wave_number: new_wave }
+        OperationResponse::WaveStarted {
+            wave_number: new_wave,
+        }
     }
 
-    async fn handle_add_public_chain(&mut self, public_chain_id: ChainId, region: String) -> OperationResponse {
+    async fn handle_add_public_chain(
+        &mut self,
+        public_chain_id: ChainId,
+        region: String,
+    ) -> OperationResponse {
         // 1. Validate admin (SECURITY FIX - using guards module)
         let params = self.runtime.application_parameters();
         guards::ensure_admin(self.runtime.chain_id(), &params)
@@ -402,7 +462,9 @@ impl TowerDefenseContract {
             available_slots: 1000,
         };
 
-        self.state.public_chains.insert(&public_chain_id, info)
+        self.state
+            .public_chains
+            .insert(&public_chain_id, info)
             .expect("Failed to insert public chain");
 
         OperationResponse::Ok
@@ -412,10 +474,10 @@ impl TowerDefenseContract {
 
     async fn handle_find_game_request(&mut self, user_chain: ChainId) {
         // This runs on public chain - find available game or create/assign one
-        
+
         // Get available game chains from state
         let available = self.state.available_game_chains.get().clone();
-        
+
         let game_chain = if available.is_empty() {
             // No dedicated game chains - use this chain as the game chain
             // In production, you'd create a new game chain here
@@ -487,12 +549,21 @@ impl TowerDefenseContract {
 
         // Update enemies (movement)
         let grid = self.state.grid.get();
-        let enemy_ids: Vec<u64> = self.state.enemies.indices().await
+        let enemy_ids: Vec<u64> = self
+            .state
+            .enemies
+            .indices()
+            .await
             .expect("Failed to get enemy indices");
 
         for enemy_id in enemy_ids.clone() {
-            let mut enemy = match self.state.enemies.get(&enemy_id).await
-                .expect("Failed to get enemy") {
+            let mut enemy = match self
+                .state
+                .enemies
+                .get(&enemy_id)
+                .await
+                .expect("Failed to get enemy")
+            {
                 Some(e) => e,
                 None => continue,
             };
@@ -508,7 +579,9 @@ impl TowerDefenseContract {
                 self.state.base_health.set(base_health);
 
                 // Remove enemy
-                self.state.enemies.remove(&enemy_id)
+                self.state
+                    .enemies
+                    .remove(&enemy_id)
                     .expect("Failed to remove enemy");
 
                 if base_health == 0 {
@@ -518,18 +591,29 @@ impl TowerDefenseContract {
                 }
             } else {
                 // Update enemy position
-                self.state.enemies.insert(&enemy_id, enemy)
+                self.state
+                    .enemies
+                    .insert(&enemy_id, enemy)
                     .expect("Failed to update enemy");
             }
         }
 
         // Tower shooting logic
-        let tower_ids: Vec<u64> = self.state.towers.indices().await
+        let tower_ids: Vec<u64> = self
+            .state
+            .towers
+            .indices()
+            .await
             .expect("Failed to get tower indices");
 
         for tower_id in tower_ids {
-            let mut tower = match self.state.towers.get(&tower_id).await
-                .expect("Failed to get tower") {
+            let mut tower = match self
+                .state
+                .towers
+                .get(&tower_id)
+                .await
+                .expect("Failed to get tower")
+            {
                 Some(t) => t,
                 None => continue,
             };
@@ -540,13 +624,22 @@ impl TowerDefenseContract {
             }
 
             // Find target
-            let enemy_ids: Vec<u64> = self.state.enemies.indices().await
+            let enemy_ids: Vec<u64> = self
+                .state
+                .enemies
+                .indices()
+                .await
                 .expect("Failed to get enemy indices");
 
             let mut enemies_with_ids = Vec::new();
             for id in enemy_ids {
-                if let Some(enemy) = self.state.enemies.get(&id).await
-                    .expect("Failed to get enemy") {
+                if let Some(enemy) = self
+                    .state
+                    .enemies
+                    .get(&id)
+                    .await
+                    .expect("Failed to get enemy")
+                {
                     enemies_with_ids.push((id, enemy));
                 }
             }
@@ -555,7 +648,11 @@ impl TowerDefenseContract {
                 // Fire at target
                 tower.last_shot_micros = current_time;
 
-                let mut target = self.state.enemies.get(&target_id).await
+                let mut target = self
+                    .state
+                    .enemies
+                    .get(&target_id)
+                    .await
                     .expect("Failed to get target")
                     .expect("Target not found");
 
@@ -575,25 +672,35 @@ impl TowerDefenseContract {
                     self.state.shared_gold.set(gold);
 
                     // Remove enemy
-                    self.state.enemies.remove(&target_id)
+                    self.state
+                        .enemies
+                        .remove(&target_id)
                         .expect("Failed to remove enemy");
 
                     // Emit event (would need owner tracking)
                 } else {
                     // Update enemy
-                    self.state.enemies.insert(&target_id, target)
+                    self.state
+                        .enemies
+                        .insert(&target_id, target)
                         .expect("Failed to update enemy");
                 }
 
                 // Update tower stats
                 tower.record_damage(damage as u64);
-                self.state.towers.insert(&tower_id, tower)
+                self.state
+                    .towers
+                    .insert(&tower_id, tower)
                     .expect("Failed to update tower");
             }
         }
 
         // Check wave completion
-        let enemy_count = self.state.enemies.count().await
+        let enemy_count = self
+            .state
+            .enemies
+            .count()
+            .await
             .expect("Failed to count enemies");
 
         if enemy_count == 0 {
@@ -646,12 +753,20 @@ impl TowerDefenseContract {
         });
 
         // Collect player scores
-        let player_ids: Vec<AccountOwner> = self.state.players.indices().await
+        let player_ids: Vec<AccountOwner> = self
+            .state
+            .players
+            .indices()
+            .await
             .expect("Failed to get player indices");
 
         let mut scores = Vec::new();
         for owner in player_ids {
-            let stats = self.state.players.get(&owner).await
+            let stats = self
+                .state
+                .players
+                .get(&owner)
+                .await
                 .expect("Failed to get player stats")
                 .expect("Player stats not found");
 
@@ -666,16 +781,17 @@ impl TowerDefenseContract {
 
         // Report to master chain
         let params = self.runtime.application_parameters();
-        self.send_message(
-            params.master_chain,
-            Message::ReportScore { scores },
-        );
+        self.send_message(params.master_chain, Message::ReportScore { scores });
     }
 
     async fn handle_report_score(&mut self, scores: Vec<PlayerScore>) {
         // This runs on master chain
         for score in scores {
-            let mut entry = self.state.leaderboard.get(&score.owner).await
+            let mut entry = self
+                .state
+                .leaderboard
+                .get(&score.owner)
+                .await
                 .expect("Failed to get leaderboard entry")
                 .unwrap_or(LeaderboardEntry {
                     player: score.owner,
@@ -696,7 +812,9 @@ impl TowerDefenseContract {
             entry.total_damage = entry.total_damage.saturating_add(score.damage_dealt);
             entry.last_updated = self.runtime.system_time().micros();
 
-            self.state.leaderboard.insert(&score.owner, entry)
+            self.state
+                .leaderboard
+                .insert(&score.owner, entry)
                 .expect("Failed to update leaderboard");
         }
     }
@@ -714,7 +832,9 @@ impl TowerDefenseContract {
         // Note: with_delay was removed in linera-sdk 0.15.x
         // Messages are sent immediately - game tick timing is handled differently
         self.runtime
-            .prepare_message(Message::GameTick { delta_time_micros: _delay_micros })
+            .prepare_message(Message::GameTick {
+                delta_time_micros: _delay_micros,
+            })
             .with_tracking()
             .send_to(self.runtime.chain_id());
     }

@@ -1,5 +1,5 @@
+use linera_sdk::linera_base_types::{AccountOwner, ChainId};
 use linera_sdk::views::{linera_views, MapView, RegisterView, RootView, ViewStorageContext};
-use linera_sdk::linera_base_types::{ChainId, AccountOwner};
 use serde::{Deserialize, Serialize};
 use tower_defense_abi::*;
 
@@ -54,7 +54,7 @@ pub struct TowerDefenseState {
     pub towers: MapView<u64, Tower>,
 
     /// Tower ownership (tower_id -> owner)
-    pub tower_owners: MapView<u64,  AccountOwner>,
+    pub tower_owners: MapView<u64, AccountOwner>,
 
     /// Active enemies (indexed by enemy ID)
     pub enemies: MapView<u64, Enemy>,

@@ -1,6 +1,6 @@
-/// Security guards and validation utilities
-use linera_sdk::linera_base_types::{ChainId, AccountOwner};
 use crate::{state::TowerDefenseState, TowerDefenseParameters};
+/// Security guards and validation utilities
+use linera_sdk::linera_base_types::{AccountOwner, ChainId};
 
 /// Maximum string lengths to prevent state bloat
 pub const MAX_REGION_LENGTH: usize = 100;
@@ -17,7 +17,10 @@ pub const PLACE_TOWER_RATE_LIMIT: u32 = 10;
 pub const UPGRADE_TOWER_RATE_LIMIT: u32 = 20;
 
 /// Admin validation
-pub fn ensure_admin(chain_id: ChainId, params: &TowerDefenseParameters) -> Result<(), &'static str> {
+pub fn ensure_admin(
+    chain_id: ChainId,
+    params: &TowerDefenseParameters,
+) -> Result<(), &'static str> {
     if chain_id != params.master_chain {
         return Err("Unauthorized: Only master chain can perform this operation");
     }
@@ -27,7 +30,10 @@ pub fn ensure_admin(chain_id: ChainId, params: &TowerDefenseParameters) -> Resul
 /// Validate string length
 pub fn validate_string_length(s: &str, max_len: usize, field_name: &str) -> Result<(), String> {
     if s.len() > max_len {
-        return Err(format!("{} exceeds maximum length of {}", field_name, max_len));
+        return Err(format!(
+            "{} exceeds maximum length of {}",
+            field_name, max_len
+        ));
     }
     Ok(())
 }
@@ -38,7 +44,10 @@ pub async fn ensure_tower_owner(
     tower_id: u64,
     owner: AccountOwner,
 ) -> Result<(), &'static str> {
-    let tower_owner = state.tower_owners.get(&tower_id).await
+    let tower_owner = state
+        .tower_owners
+        .get(&tower_id)
+        .await
         .map_err(|_| "Failed to get tower owner")?
         .ok_or("Tower not found")?;
 
@@ -70,10 +79,7 @@ pub async fn check_tower_limit(
 }
 
 /// Validate wave start timing
-pub fn validate_wave_timing(
-    last_wave_time: u64,
-    current_time: u64,
-) -> Result<(), &'static str> {
+pub fn validate_wave_timing(last_wave_time: u64, current_time: u64) -> Result<(), &'static str> {
     let elapsed = current_time.saturating_sub(last_wave_time);
     if elapsed < WAVE_START_COOLDOWN_MICROS {
         return Err("Please wait before starting next wave");

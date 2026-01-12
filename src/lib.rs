@@ -1,16 +1,16 @@
-pub mod state;
 pub mod contract;
-pub mod service;
 pub mod guards;
+pub mod service;
+pub mod state;
 
 use async_graphql::{Request, Response};
-use linera_sdk::linera_base_types::{ChainId, ContractAbi, ServiceAbi, AccountOwner};
+use linera_sdk::linera_base_types::{AccountOwner, ChainId, ContractAbi, ServiceAbi};
 use serde::{Deserialize, Serialize};
 use tower_defense_abi::*;
 
-pub use state::*;
 pub use contract::TowerDefenseContract;
 pub use service::TowerDefenseService;
+pub use state::*;
 
 /// Application parameters
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,18 +31,14 @@ pub enum Operation {
     PlaceTower {
         position_x: u8,
         position_y: u8,
-        tower_type: TowerType
+        tower_type: TowerType,
     },
 
     /// Upgrade an existing tower
-    UpgradeTower {
-        tower_id: u64
-    },
+    UpgradeTower { tower_id: u64 },
 
     /// Sell a tower for gold
-    SellTower {
-        tower_id: u64
-    },
+    SellTower { tower_id: u64 },
 
     /// Start the next wave
     StartWave {},
@@ -51,7 +47,7 @@ pub enum Operation {
     /// Add a new public chain to the registry (master only)
     AddPublicChain {
         public_chain_id: ChainId,
-        region: String
+        region: String,
     },
 }
 
@@ -70,24 +66,16 @@ pub enum OperationResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Message {
     /// Request to find a game (user chain -> public chain)
-    FindGameRequest {
-        user_chain: ChainId
-    },
+    FindGameRequest { user_chain: ChainId },
 
     /// Response with game chain assignment (public chain -> user chain)
-    FindGameResult {
-        game_chain: Option<ChainId>
-    },
+    FindGameResult { game_chain: Option<ChainId> },
 
     /// Game tick for processing game logic
-    GameTick {
-        delta_time_micros: u64
-    },
+    GameTick { delta_time_micros: u64 },
 
     /// Report final scores to master chain (game chain -> master chain)
-    ReportScore {
-        scores: Vec<PlayerScore>
-    },
+    ReportScore { scores: Vec<PlayerScore> },
 }
 
 /// Events emitted by the application
@@ -95,12 +83,12 @@ pub enum Message {
 pub enum TowerDefenseEvent {
     TowerPlaced {
         tower_id: u64,
-        tower: Tower
+        tower: Tower,
     },
 
     TowerUpgraded {
         tower_id: u64,
-        new_level: u8
+        new_level: u8,
     },
 
     TowerSold {
@@ -121,7 +109,7 @@ pub enum TowerDefenseEvent {
 
     WaveCompleted {
         wave_number: u32,
-        bonus_gold: u64
+        bonus_gold: u64,
     },
 
     GameOver {
@@ -158,7 +146,10 @@ mod tests {
         let deserialized: Operation = serde_json::from_str(&serialized).unwrap();
 
         match deserialized {
-            Operation::PlaceTower { position, tower_type } => {
+            Operation::PlaceTower {
+                position,
+                tower_type,
+            } => {
                 assert_eq!(position, (5, 5));
                 assert_eq!(tower_type, TowerType::Arrow);
             }
@@ -196,7 +187,11 @@ mod tests {
         let deserialized: TowerDefenseEvent = serde_json::from_str(&serialized).unwrap();
 
         match deserialized {
-            TowerDefenseEvent::EnemyKilled { enemy_id, killed_by, gold_reward } => {
+            TowerDefenseEvent::EnemyKilled {
+                enemy_id,
+                killed_by,
+                gold_reward,
+            } => {
                 assert_eq!(enemy_id, 42);
                 assert_eq!(killed_by, owner);
                 assert_eq!(gold_reward, 100);

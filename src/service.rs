@@ -1,16 +1,14 @@
 #![cfg_attr(target_arch = "wasm32", no_main)]
 
-use async_graphql::{
-    EmptyMutation, EmptySubscription, Object, Schema, SimpleObject,
-};
+use crate::{state::*, TowerDefenseParameters};
+use async_graphql::{EmptyMutation, EmptySubscription, Object, Schema, SimpleObject};
 use linera_sdk::{
-    linera_base_types::{WithServiceAbi, AccountOwner},
+    linera_base_types::{AccountOwner, WithServiceAbi},
     views::View,
     Service, ServiceRuntime,
 };
 use std::sync::Arc;
 use tower_defense_abi::*;
-use crate::{state::*, TowerDefenseParameters};
 
 pub struct TowerDefenseService {
     state: Arc<TowerDefenseState>,
@@ -58,7 +56,6 @@ pub struct QueryRoot {
     runtime: Arc<ServiceRuntime<TowerDefenseService>>,
 }
 
-
 // ===== GraphQL Queries =====
 // Note: Mutations are executed via contract operations, not via GraphQL service
 
@@ -91,7 +88,11 @@ impl QueryRoot {
         GridData {
             width: grid.width as i32,
             height: grid.height as i32,
-            path: grid.path.iter().map(|(x, y)| vec![*x as i32, *y as i32]).collect(),
+            path: grid
+                .path
+                .iter()
+                .map(|(x, y)| vec![*x as i32, *y as i32])
+                .collect(),
             spawn_point: vec![grid.spawn_point.0 as i32, grid.spawn_point.1 as i32],
             base_point: vec![grid.base_point.0 as i32, grid.base_point.1 as i32],
         }
@@ -111,13 +112,22 @@ impl QueryRoot {
     // ===== Tower Queries =====
 
     async fn towers(&self) -> Vec<TowerData> {
-        let indices = self.state.towers.indices().await
+        let indices = self
+            .state
+            .towers
+            .indices()
+            .await
             .expect("Failed to get tower indices");
 
         let mut towers = Vec::new();
         for id in indices {
-            if let Some(tower) = self.state.towers.get(&id).await
-                .expect("Failed to get tower") {
+            if let Some(tower) = self
+                .state
+                .towers
+                .get(&id)
+                .await
+                .expect("Failed to get tower")
+            {
                 towers.push(TowerData::from(tower));
             }
         }
@@ -126,26 +136,42 @@ impl QueryRoot {
 
     async fn tower(&self, tower_id: String) -> Option<TowerData> {
         let id = tower_id.parse::<u64>().ok()?;
-        let tower = self.state.towers.get(&id).await
+        let tower = self
+            .state
+            .towers
+            .get(&id)
+            .await
             .expect("Failed to get tower")?;
         Some(TowerData::from(tower))
     }
 
     async fn tower_count(&self) -> i32 {
-        self.state.towers.count().await
+        self.state
+            .towers
+            .count()
+            .await
             .expect("Failed to count towers") as i32
     }
 
     // ===== Enemy Queries =====
 
     async fn enemies(&self) -> Vec<EnemyData> {
-        let indices = self.state.enemies.indices().await
+        let indices = self
+            .state
+            .enemies
+            .indices()
+            .await
             .expect("Failed to get enemy indices");
 
         let mut enemies = Vec::new();
         for id in indices {
-            if let Some(enemy) = self.state.enemies.get(&id).await
-                .expect("Failed to get enemy") {
+            if let Some(enemy) = self
+                .state
+                .enemies
+                .get(&id)
+                .await
+                .expect("Failed to get enemy")
+            {
                 enemies.push(EnemyData::from(enemy));
             }
         }
@@ -154,26 +180,42 @@ impl QueryRoot {
 
     async fn enemy(&self, enemy_id: String) -> Option<EnemyData> {
         let id = enemy_id.parse::<u64>().ok()?;
-        let enemy = self.state.enemies.get(&id).await
+        let enemy = self
+            .state
+            .enemies
+            .get(&id)
+            .await
             .expect("Failed to get enemy")?;
         Some(EnemyData::from(enemy))
     }
 
     async fn enemy_count(&self) -> i32 {
-        self.state.enemies.count().await
+        self.state
+            .enemies
+            .count()
+            .await
             .expect("Failed to count enemies") as i32
     }
 
     // ===== Player Queries =====
 
     async fn players(&self) -> Vec<PlayerData> {
-        let indices = self.state.players.indices().await
+        let indices = self
+            .state
+            .players
+            .indices()
+            .await
             .expect("Failed to get player indices");
 
         let mut players = Vec::new();
         for owner in indices {
-            if let Some(stats) = self.state.players.get(&owner).await
-                .expect("Failed to get player stats") {
+            if let Some(stats) = self
+                .state
+                .players
+                .get(&owner)
+                .await
+                .expect("Failed to get player stats")
+            {
                 players.push(PlayerData::from_stats(owner, stats));
             }
         }
@@ -206,14 +248,18 @@ impl QueryRoot {
     }
 
     async fn unlocked_towers(&self) -> Vec<String> {
-        self.state.unlocked_towers.get()
+        self.state
+            .unlocked_towers
+            .get()
             .iter()
             .map(|t| format!("{:?}", t))
             .collect()
     }
 
     async fn current_game_chain(&self) -> Option<String> {
-        self.state.current_game_chain.get()
+        self.state
+            .current_game_chain
+            .get()
             .as_ref()
             .map(|chain| format!("{:?}", chain))
     }
@@ -222,13 +268,22 @@ impl QueryRoot {
 
     async fn leaderboard(&self, limit: Option<i32>) -> Vec<LeaderboardEntryData> {
         let limit = limit.unwrap_or(100).min(100) as usize;
-        let indices = self.state.leaderboard.indices().await
+        let indices = self
+            .state
+            .leaderboard
+            .indices()
+            .await
             .expect("Failed to get leaderboard indices");
 
         let mut entries = Vec::new();
         for owner in indices.into_iter().take(limit) {
-            if let Some(entry) = self.state.leaderboard.get(&owner).await
-                .expect("Failed to get leaderboard entry") {
+            if let Some(entry) = self
+                .state
+                .leaderboard
+                .get(&owner)
+                .await
+                .expect("Failed to get leaderboard entry")
+            {
                 entries.push(LeaderboardEntryData::from(entry));
             }
         }
@@ -275,13 +330,22 @@ impl QueryRoot {
     // ===== Public Chain Queries =====
 
     async fn public_chains(&self) -> Vec<PublicChainData> {
-        let indices = self.state.public_chains.indices().await
+        let indices = self
+            .state
+            .public_chains
+            .indices()
+            .await
             .expect("Failed to get public chain indices");
 
         let mut chains = Vec::new();
         for chain_id in indices {
-            if let Some(info) = self.state.public_chains.get(&chain_id).await
-                .expect("Failed to get public chain info") {
+            if let Some(info) = self
+                .state
+                .public_chains
+                .get(&chain_id)
+                .await
+                .expect("Failed to get public chain info")
+            {
                 chains.push(PublicChainData {
                     chain_id: format!("{:?}", info.chain_id),
                     region: info.region.clone(),
@@ -369,7 +433,11 @@ impl PlayerData {
             chain_id: format!("{:?}", stats.chain_id),
             kills: stats.kills as i32,
             damage_dealt: stats.damage_dealt.to_string(),
-            towers_placed: stats.towers_placed.iter().map(|id| id.to_string()).collect(),
+            towers_placed: stats
+                .towers_placed
+                .iter()
+                .map(|id| id.to_string())
+                .collect(),
             gold_spent: stats.gold_spent.to_string(),
         }
     }
