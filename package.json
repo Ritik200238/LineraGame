@@ -1,45 +1,43 @@
 {
-  "name": "tower-defense-multiplayer",
+  "name": "tower-defense-linera",
   "version": "1.0.0",
-  "description": "Multiplayer tower defense game on Linera blockchain",
-  "main": "frontend/index.html",
+  "description": "Multiplayer Tower Defense game built for Linera blockchain",
+  "main": "mock-backend-simple.js",
   "scripts": {
-    "test": "playwright test",
-    "test:multiplayer": "playwright test tests/multiplayer-modes.spec.js",
-    "test:stress": "playwright test tests/stress-tests.spec.js",
-    "test:validation": "playwright test tests/final-validation.spec.js",
-    "test:all": "playwright test tests/",
-    "test:report": "playwright show-report",
-    "test:debug": "playwright test --debug",
-    "test:ui": "playwright test --ui",
-    "install:playwright": "npx playwright install chromium"
+    "start": "node mock-backend-simple.js",
+    "start:frontend": "cd frontend && python -m http.server 8080",
+    "test": "node test-final-comprehensive.js",
+    "test:multiplayer": "node test-multiplayer-simple.js",
+    "test:stress": "node test-extreme-stress.js",
+    "test:edge": "node test-edge-cases.js",
+    "test:performance": "node test-performance-monitor.js",
+    "test:all": "npm run test && npm run test:multiplayer && npm run test:stress"
   },
   "keywords": [
-    "blockchain",
     "tower-defense",
-    "multiplayer",
     "linera",
-    "web3",
-    "game"
+    "blockchain",
+    "multiplayer",
+    "game",
+    "web3"
   ],
-  "author": "Claude Sonnet 4.5",
+  "author": "Ritik200238",
   "license": "MIT",
+  "dependencies": {
+    "@apollo/server": "^4.10.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "graphql": "^16.8.1"
+  },
   "devDependencies": {
-    "@playwright/test": "^1.40.0"
+    "playwright": "^1.40.0"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/tower-defense.git"
+    "url": "https://github.com/Ritik200238/LineraGame.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/tower-defense/issues"
+    "url": "https://github.com/Ritik200238/LineraGame/issues"
   },
-  "homepage": "https://github.com/yourusername/tower-defense#readme",
-  "dependencies": {
-    "@apollo/server": "^5.2.0",
-    "body-parser": "^2.2.2",
-    "cors": "^2.8.5",
-    "express": "^5.2.1",
-    "graphql": "^16.12.0"
-  }
+  "homepage": "https://github.com/Ritik200238/LineraGame#readme"
 }
